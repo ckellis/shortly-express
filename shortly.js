@@ -33,11 +33,19 @@ function(req, res) {
   res.render('index');
 });
 
+app.use('/links', function(req, res, next) {
+  if (req.session) {
+    next();
+  } else {
+    res.redirect('/login');
+  }
+});
+
 app.get('/links', 
 function(req, res) {
   Links.reset().fetch().then(function(links) {
     res.send(200, links.models);
-  });
+  })
 });
 
 app.post('/links', 
@@ -72,10 +80,73 @@ function(req, res) {
   });
 });
 
+app.get('/login', function(req, res, next) {
+  res.render('login');
+});
+
+app.get('/signup', function(req, res) {
+  res.render('signup');
+});
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
 
+app.post('/login', function(req, res) {
+  // {username: username, password: password}
+
+  Users.query({where : {username : req.body.username} })
+    .fetchOne()
+    .then(function(userModel) {
+      console.log(userModel);
+      if (userModel.checkPassword(req.body.password)) {
+        console.log("OK");
+        // give them their links 
+      } else {
+        res.redirect(301, login);
+      }
+    })
+})
+//check if user is currently logged in
+  //if yes, give them their list
+//if not, prompt login
+
+
+//if get request to signup button
+  // redirect to signup page
+
+app.post('/signup', function(req, res) {
+  console.log('in signup');
+  console.log(req.body);
+  new User({
+      username : req.body.username,
+      password : req.body.password
+    })
+    .save()
+    .then(function(userModel) {
+    return Users.add(userModel);
+  })
+
+
+  .then(function() {
+    console.log("New user created")
+  })
+  .catch(function(err) {
+    console.log("OH NO " + err);
+  })
+})
+//if post request to signup
+  //check if username exists
+    // if not
+      //salt password
+      //hash password
+      //store username, password and salt
+
+
+//if post request to login
+  //look up password and salt
+  //add salt, hash 
+  //if match, give them their list and cookie
+  //if not, prompt login
 
 
 /************************************************************/
