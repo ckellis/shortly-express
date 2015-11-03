@@ -2,6 +2,7 @@ var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
+var session = require('express-session');
 
 
 var db = require('./app/config');
@@ -22,10 +23,13 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
+app.use(session({
+  secret : 'hello'
+}));
 
 app.get('/', 
 function(req, res) {
-  res.render('index');
+    res.render('index');
 });
 
 app.get('/create', 
@@ -34,24 +38,34 @@ function(req, res) {
 });
 
 app.use('/links', function(req, res, next) {
-  if (req.session) {
+  if (req.session.user) {
     next();
   } else {
     res.redirect('/login');
   }
 });
 
+
 app.get('/links', 
 function(req, res) {
-  Links.reset().fetch().then(function(links) {
-    res.send(200, links.models);
-  })
+Links.reset().fetch().then(function(links) {
+  return Users.query({where : {username : req.session.user}}).fetchOne()
+  }).then(function (userModel) {
+    console.log(userModel)
+    return userModel.links()
+  }).then(function (links) {
+    console.log(links)
+    return res.send(200, links.models);
+  });
+  // Links.reset().fetch().then(function(links) {
+
+  // })
 });
 
 app.post('/links', 
 function(req, res) {
+  console.log("here")
   var uri = req.body.url;
-
   if (!util.isValidUrl(uri)) {
     console.log('Not a valid url: ', uri);
     return res.send(404);
@@ -73,7 +87,13 @@ function(req, res) {
           base_url: req.headers.origin
         })
         .then(function(newLink) {
-          res.send(200, newLink);
+          return Users.query({where : {username : req.session.user} })
+          .fetchOne()
+          .then(function (userModel) {
+            console.log(userModel)
+            userModel.links().attach(newLink);
+            res.send(200, newLink);
+          });
         });
       });
     }
@@ -98,11 +118,15 @@ app.post('/login', function(req, res) {
     .fetchOne()
     .then(function(userModel) {
       console.log(userModel);
+      console.log(userModel.checkPassword(req.body.password));
       if (userModel.checkPassword(req.body.password)) {
         console.log("OK");
-        // give them their links 
+        req.session.regenerate(function(){
+          req.session.user = req.body.username;
+          res.redirect(301, '/');
+        })
       } else {
-        res.redirect(301, login);
+        res.redirect(301, '/login');
       }
     })
 })
