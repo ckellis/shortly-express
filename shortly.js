@@ -24,45 +24,46 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
 app.use(session({
+  // genid: function(req){
+  //   return req.username;
+  // },
   secret : 'hello'
 }));
 
-app.get('/', 
-function(req, res) {
-    res.render('index');
-});
-
-app.get('/create', 
-function(req, res) {
-  res.render('index');
-});
-
-app.use('/links', function(req, res, next) {
+var isLoggedIn = function (req, res, next) {
   if (req.session.user) {
     next();
   } else {
     res.redirect('/login');
   }
-});
+}
 
-
-app.get('/links', 
+app.get('/', isLoggedIn, 
 function(req, res) {
-Links.reset().fetch().then(function(links) {
-  return Users.query({where : {username : req.session.user}}).fetchOne()
-  }).then(function (userModel) {
-    console.log(userModel)
-    return userModel.links()
-  }).then(function (links) {
-    console.log(links)
-    return res.send(200, links.models);
-  });
-  // Links.reset().fetch().then(function(links) {
-
-  // })
+    res.render('index');
 });
 
-app.post('/links', 
+app.get('/create', isLoggedIn, 
+function(req, res) {
+  res.render('index');
+});
+
+
+app.get('/links', isLoggedIn, 
+function(req, res) {
+  Links.reset().fetch().then(function(links) {
+      res.send(200, links.models);
+  })
+});
+
+app.get('/logout', isLoggedIn,
+  function(req, res) {
+    console.log("logging out")
+    req.session.destroy();
+    res.render('login');
+  })
+
+app.post('/links', isLoggedIn, 
 function(req, res) {
   console.log("here")
   var uri = req.body.url;
@@ -87,13 +88,8 @@ function(req, res) {
           base_url: req.headers.origin
         })
         .then(function(newLink) {
-          return Users.query({where : {username : req.session.user} })
-          .fetchOne()
-          .then(function (userModel) {
-            console.log(userModel)
-            userModel.links().attach(newLink);
-            res.send(200, newLink);
-          });
+          console.log(newLink)
+          res.send(200, newLink);
         });
       });
     }
@@ -130,13 +126,6 @@ app.post('/login', function(req, res) {
       }
     })
 })
-//check if user is currently logged in
-  //if yes, give them their list
-//if not, prompt login
-
-
-//if get request to signup button
-  // redirect to signup page
 
 app.post('/signup', function(req, res) {
   console.log('in signup');
@@ -158,20 +147,6 @@ app.post('/signup', function(req, res) {
     console.log("OH NO " + err);
   })
 })
-//if post request to signup
-  //check if username exists
-    // if not
-      //salt password
-      //hash password
-      //store username, password and salt
-
-
-//if post request to login
-  //look up password and salt
-  //add salt, hash 
-  //if match, give them their list and cookie
-  //if not, prompt login
-
 
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail

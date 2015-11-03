@@ -3,7 +3,8 @@ window.Shortly = Backbone.View.extend({
 
   events: {
     'click li a.index':  'renderIndexView',
-    'click li a.create': 'renderCreateView'
+    'click li a.create': 'renderCreateView',
+    'click li a.logout' : 'logoutUser'
   },
 
   initialize: function(){
@@ -36,5 +37,11 @@ window.Shortly = Backbone.View.extend({
       .removeClass('selected')
       .filter('.' + routeName)
       .addClass('selected');
+  },
+
+  logoutUser : function(e) {
+    this.router.logout(function(html) {
+      $('body').html(html)
+    }.bind(this)); 
   }
 });
