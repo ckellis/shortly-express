@@ -3,6 +3,7 @@ var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
 var session = require('express-session');
+var oAuth = require('oauthio-web');
 
 
 var db = require('./app/config');
@@ -34,6 +35,12 @@ var isLoggedIn = function (req, res, next) {
     res.redirect('/login');
   }
 }
+var associateWithUser = function(req, link) {
+  return new User({username : req.session.user}).fetch()
+    .then(function(user) {
+       return user.links().attach(link)
+    })
+}
 
 app.get('/', isLoggedIn, 
 function(req, res) {
@@ -48,9 +55,10 @@ function(req, res) {
 
 app.get('/links', isLoggedIn, 
 function(req, res) {
-  Links.reset().fetch().then(function(links) {
-      res.send(200, links.models);
-  })
+  new User({username : req.session.user}).fetch({ withRelated : ['links'] })
+    .then(function(joined) {
+      res.send(200, joined.relations.links.models);
+    });
 });
 
 app.get('/logout', isLoggedIn,
@@ -67,9 +75,12 @@ function(req, res) {
     return res.send(404);
   }
 
-  new Link({ url: uri }).fetch().then(function(found) {
-    if (found) {
-      res.send(200, found.attributes);
+  new Link({ url: uri }).fetch().then(function(link) {
+    if (link) {
+      associateWithUser(req, link)
+      .then(function() {
+        res.send(200, link.attributes);
+      })
     } else {
       util.getUrlTitle(uri, function(err, title) {
         if (err) {
@@ -83,12 +94,16 @@ function(req, res) {
           base_url: req.headers.origin
         })
         .then(function(newLink) {
-          res.send(200, newLink);
+            associateWithUser(req, newLink)
+            .then(function(){
+              res.send(200, newLink)
+            });
         });
       });
     }
   });
 });
+
 
 app.get('/login', function(req, res, next) {
   res.render('login');
@@ -109,7 +124,7 @@ app.post('/login', function(req, res) {
           userModel.checkPassword(req.body.password, function(match) {
             if (match) {
               req.session.regenerate(function(){
-                req.session.user = userModel;
+                req.session.user = req.body.username;
                 res.redirect('/');    
               }) 
             } else {
@@ -138,6 +153,7 @@ app.post('/signup', function(req, res) {
         })
         .then(function() {
           console.log("New user created");
+          res.redirect('/login');
         })
         .catch(function(err) {
           console.log("OH NO " + err);
