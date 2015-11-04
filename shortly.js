@@ -24,9 +24,6 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
 app.use(session({
-  // genid: function(req){
-  //   return req.username;
-  // },
   secret : 'hello'
 }));
 
@@ -58,14 +55,12 @@ function(req, res) {
 
 app.get('/logout', isLoggedIn,
   function(req, res) {
-    console.log("logging out")
     req.session.destroy();
     res.render('login');
   })
 
 app.post('/links', isLoggedIn, 
 function(req, res) {
-  console.log("here")
   var uri = req.body.url;
   if (!util.isValidUrl(uri)) {
     console.log('Not a valid url: ', uri);
@@ -88,7 +83,6 @@ function(req, res) {
           base_url: req.headers.origin
         })
         .then(function(newLink) {
-          console.log(newLink)
           res.send(200, newLink);
         });
       });
@@ -109,43 +103,47 @@ app.get('/signup', function(req, res) {
 
 app.post('/login', function(req, res) {
   // {username: username, password: password}
-
-  Users.query({where : {username : req.body.username} })
-    .fetchOne()
+  new User({username : req.body.username}).fetch()
     .then(function(userModel) {
-      console.log(userModel);
-      console.log(userModel.checkPassword(req.body.password));
-      if (userModel.checkPassword(req.body.password)) {
-        console.log("OK");
-        req.session.regenerate(function(){
-          req.session.user = req.body.username;
-          res.redirect(301, '/');
-        })
-      } else {
-        res.redirect(301, '/login');
-      }
-    })
-})
+        if (userModel) {
+          userModel.checkPassword(req.body.password, function(match) {
+            if (match) {
+              req.session.regenerate(function(){
+                req.session.user = userModel;
+                res.redirect('/');    
+              }) 
+            } else {
+              res.redirect('/login');              
+            }
+          });
+        } else {
+        res.redirect('/signup')
+        }
+    });
+});
 
 app.post('/signup', function(req, res) {
-  console.log('in signup');
-  console.log(req.body);
-  new User({
-      username : req.body.username,
-      password : req.body.password
-    })
-    .save()
+  new User({username : req.body.username}).fetch()
     .then(function(userModel) {
-    return Users.add(userModel);
-  })
-
-
-  .then(function() {
-    console.log("New user created")
-  })
-  .catch(function(err) {
-    console.log("OH NO " + err);
-  })
+      if (userModel) {
+        res.redirect('/login');
+      } else {
+        new User({
+          username : req.body.username,
+          password : req.body.password
+        })
+        .save()
+        .then(function(userModel) {
+          return Users.add(userModel);
+        })
+        .then(function() {
+          console.log("New user created");
+        })
+        .catch(function(err) {
+          console.log("OH NO " + err);
+        })
+      }
+    })
 })
 
 /************************************************************/

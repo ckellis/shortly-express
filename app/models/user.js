@@ -16,12 +16,19 @@ var User = db.Model.extend({
     return this.belongsToMany(Link);
   },
   initialize : function() {
-    this.on('creating', function(model, attrs, options) {
-      model.set('password', sha1(model.attributes.password));
+    this.on('creating', this.hashPassword);
+  },
+  checkPassword : function(password, callback) {
+    bcrypt.compare(password, this.get('password'), function(err, isMatch) {
+      callback(isMatch);
     });
   },
-  checkPassword : function(password) {
-    return this.get('password') == sha1(password); 
+  hashPassword: function() {
+    var cipher = Promise.promisify(bcrypt.hash);
+    return cipher(this.get('password'), null, null).bind(this)
+      .then(function(hash) {
+        this.set('password', hash);
+      })
   }
 });
 
